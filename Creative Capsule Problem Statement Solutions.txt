@@ -1,0 +1,203 @@
+In Memory Key Value Store TTl
+
+for API fuctons:
+
+1 put (key, value,ttlinseconds)
+2 get (key)
+3 delete (key)
+
+
+____________________________________________________________________________
+
+(Done)Problem Statement 1:
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+
+
+public class InMemoryKeyValueStore<K,V>
+{
+    private static class CacheEntry<V>
+    {
+        final V value;
+        final Long expiryTime;
+        
+        CacheEntry (V value , Long expiryTime)
+        {
+            this.value = value;
+            this.expiryTime = expiryTime;
+        }
+        boolean isExpired()
+        {
+            return expiryTime != null && System.currentTimeMillis() > expiryTime;
+        }
+    }
+    
+    private final Map <K, CacheEntry <V>> store = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService cleanerService;
+    
+    
+    public InMemoryKeyValueStore()
+    {
+        this.cleanerService = Executors.newSingleThreadScheduledExecutor (runnable ->
+        {
+            Thread thread = new Thread (runnable, "TTL cleaned");
+            thread.setDaemon(true);
+            return thread;
+        });
+        this.cleanerService.scheduleAtFixedRate(this::activeCleanup, 3 , 3, TimeUnit.SECONDS);
+    }
+    
+    public void put (K key, V value, Integer ttlInSeconds)
+    {
+        if (key == null)
+        return;
+        
+        Long expiryTime = null;
+        if(ttlInSeconds != null && ttlInSeconds > 0)
+        {
+            expiryTime = System.currentTimeMillis() + (ttlInSeconds * 1000L);
+        }
+        store.put(key, new CacheEntry<>(value, expiryTime));
+    }
+    
+    public V get(K key)
+    {
+        if (key == null)
+        return null;
+        
+        CacheEntry<V> entry = store.get(key);
+        if(entry == null)
+        return null;
+        
+        if (entry.isExpired())
+        {
+            store.remove(key,entry);
+            return null;
+        }
+        return entry.value;
+        
+    }
+    
+    public void delete (K key)
+    {
+        if (key != null)
+        {
+            store.remove(key);
+        }
+    }
+    
+    public void activeCleanup()
+    {
+        for (Map.Entry<K, CacheEntry<V>> entry : store.entrySet())
+        {
+            if (entry.getValue().isExpired())
+            {
+                store.remove(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+    
+    public void shutdown()
+    {
+        cleanerService.shutdown();
+    }
+}
+
+
+___________________________________________________________________________________________
+
+
+___________________________________________________________________________________________
+(Done but can be revisited)Probleb Statement 2 
+Code Review:
+1) YML is accessible openly-Security concern
+2) DB has Dirty Data
+3) Syntax Errors at various lines in review/src/test/java/schwarz/jobs/interview/coupon/core/services/CouponServiceTest.java
+4) Logical Question: why is there no check on discount validity using relational methods with db, instead of hardcoded discount availability at location review/src/test/java/schwarz/jobs/interview/coupon/core/services/CouponServiceTest.java
+5) Request Parameters are incomplete at review/src/main/java/schwarz/jobs/interview/coupon/web/dto/CouponRequestDTO.java
+more
+
+____________________________________________________________________________________________
+
+(Pending)Problem Statement 3
+
+Design a File Upload & Processing Platform that:
+• Allows users to upload files (images, PDFs, CSVs, videos, etc.)
+• Handles large files efficiently
+• Processes files asynchronously (e.g., validation, transformation, metadata extraction)
+• Stores both raw and processed data
+• Notifies users about processing status
+
+
+
+Authentication: Inclusive of URL (presigned)
+
+Load Balancing: Authorization outside of containers, Rate Limitations, File Meta connecting to DB(Postgre or similar SQL service)
+
+Messaging Queues: AWS S3 Events and Buckets
+
+Message Process and Absorption: Kafka/RabbitMQ
+
+WorkFlow Engine (Airflolw)
+
+CSV-OPLAB
+Image- Storage
+PDF-ElastiSearch
+
+
+Push Notifications for Status Updates : Web hooks, Web Sockets, Email
+
+DLQ for fault Tolerances
+
+Horizontal Auto Scaling + DB scaling (as required)
+
+Required Encriptions for Security
+
+
+
+
+____________________________________________________________________________________________
+
+(Pending)Problem Statement 4
+
+Design a Multi-Tenant SaaS Platform where:
+• Multiple customers (tenants) use the same application
+• Each tenant’s data is securely isolated
+• System supports customization per tenant
+• Scales to 25+ tenants
+• Each tenant will have multiple users with different roles
+• Provides billing, monitoring, and lifecycle management
+
+
+
+
+DNS/SAAS  --->  SSL Termination(Custom Domains) ---->API Gateway(Authentication, Traffic Management)----> Core Services(ID, Authorization, Billing)----> Asycn DB
+
+_____________________________________________________________________________________________
+
+(Pending)Problem Statement 7
+
+The objective of this exercise is to present your solution for the cloud infrastructure required for the
+application. Ensure that security, high-availability, and scalability are considered.
+1. Design and document the cloud infrastructure that will be provisioned to support the backend and
+front-end of the application.
+2. Include diagram/s showing the API, applications, cloud services such as compute, databases,
+storage, load-balancers, auth, integration services, network configurations, security, as well as
+external service integrations.
+3. Create a supporting text document that provides details that could not be included in the diagram.
+
+
+
+
+Authentication and Authorization Layer: AWS WAF, Route 53 
+
+Containers : Docker and AWS EKS for Compartmentization of data access layers
+
+Rest API for dock point handshakes + EventBridge for avoiding bottlenecks
+
+Aws Glue and EC2
